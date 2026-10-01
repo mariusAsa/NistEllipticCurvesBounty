@@ -1,0 +1,24 @@
+[project]
+name = "seeds-bounty"
+version = "0.1.0"
+description = "Use a local LLM to guess the English pre-seeds of the NIST elliptic curve seeds"
+requires-python = ">=3.14"
+dependencies = [
+    "huggingface-hub",
+    "mlx-lm>=0.31.3",
+    "python-dotenv",
+    "pyyaml",
+]
+
+[project.scripts]
+seeds-bounty = "src.main:generate_phrases"
+
+[tool.setuptools]
+packages = ["src"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+mlx-lm = { git = "https://github.com/ml-explore/mlx-lm.git" }

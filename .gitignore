@@ -1,0 +1,19 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.sample
+.venv/
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.ruff_cache/
+
+# Downloaded models and generated output
+.hf-cache/
+phrases/generated.txt
+tried.txt
+found.txt
