@@ -1,16 +1,21 @@
+import random
+from collections.abc import Generator
 from pathlib import Path
 
 import mlx.core as mx
 from dotenv import load_dotenv
 from huggingface_hub import snapshot_download
 from mlx_lm import load, stream_generate
-
-import random
+from mlx_lm.sample_utils import make_sampler
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parent
 MODEL = "mlx-community/gemma-4-e4b-it-OptiQ-4bit"
+THINKING = False
+THINKING_LEVEL = "low"
 MAX_TOKENS = 8192
+TEMPERATURE = 0.9
+TOP_P = 0.95
 
 SYSTEM_PROMPT = "You job is to help recover a lost passphrase. You do so by writing short English sentences in plain ASCII, one per line, with no numbering, quotes or commentary."
 
@@ -44,15 +49,14 @@ USER_PROMPT = """In 1997 two NSA mathematicians at Fort Meade, Jerry Solinas and
 
 
 class PhraseGenerator:
-    def __init__(self, model_name=MODEL, max_tokens=MAX_TOKENS):
+    def __init__(self) -> None:
         load_dotenv(PROJECT_ROOT / ".env")  # HF_TOKEN for faster Hugging Face downloads
         mx.random.seed(random.randint(0, 2**32 - 1))
         model_path = snapshot_download(
-            model_name,
+            MODEL,
             cache_dir=PROJECT_ROOT / ".hf-cache",
         )
         self.model, self.tokenizer = load(model_path)[:2]
-        self.max_tokens = max_tokens
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": USER_PROMPT},
@@ -60,14 +64,47 @@ class PhraseGenerator:
         self.prompt = self.tokenizer.apply_chat_template(
             messages,
             add_generation_prompt=True,
-            enable_thinking=True,
-            thinking_level="low",
+            enable_thinking=THINKING,
+            thinking_level=THINKING_LEVEL,
+            return_dict=False
         )
 
-    def stream(self):
-        return stream_generate(
+    def stream_phrases(self) -> Generator[str]:
+        """Yield phrases forever, starting a new generation whenever the model stops."""
+        while True:
+            yield from self._stream_once()
+
+    def _stream_once(self) -> Generator[str]:
+        sentence_buffer = ""
+        thinking_phase = THINKING
+        if thinking_phase:
+            print("\033[96m", end="")
+        for resp in stream_generate(
             self.model,
             self.tokenizer,
             self.prompt,
-            self.max_tokens,
-        )
+            MAX_TOKENS,
+            sampler=make_sampler(temp=TEMPERATURE, top_p=TOP_P),
+        ):
+            if not thinking_phase:
+                # yield sentences to make it easier to process them later on
+                sentence_buffer += resp.text
+                sentences = sentence_buffer.split("\n")
+                if len(sentences) > 1:
+                    for sentence in sentences[:-1]:
+                        # the model sometimes separates lines with blank ones
+                        if sentence.strip():
+                            yield sentence.strip()
+                    sentence_buffer = sentences[-1]
+            else:
+                if resp.token == self.tokenizer.think_end_id:
+                    thinking_phase = False
+                    print(
+                        f"\n\033[92mThinking complete with {round(resp.generation_tps, 2)} tps, {round(resp.peak_memory, 2)} GB peak memory.\033[0m",
+                        flush=True,
+                    )
+                    continue
+                print(resp.text, end="", flush=True)
+        # the model may stop without a trailing newline, so flush what is left
+        if sentence_buffer.strip():
+            yield sentence_buffer.strip()

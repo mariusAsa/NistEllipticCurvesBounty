@@ -1,24 +1,25 @@
 [project]
 name = "seeds-bounty"
-version = "0.1.0"
+version = "0.0.1"
 description = "Use a local LLM to guess the English pre-seeds of the NIST elliptic curve seeds"
 requires-python = ">=3.14"
 dependencies = [
     "huggingface-hub",
-    "mlx-lm>=0.31.3",
+    "mlx-lm",
     "python-dotenv",
-    "pyyaml",
 ]
 
 [project.scripts]
-seeds-bounty = "src.main:generate_phrases"
+seeds-bounty = "src.main:main"
 
-[tool.setuptools]
-packages = ["src"]
+[tool.uv.build-backend]
+# The package is the top-level `src` directory itself, not `src/<name>/`.
+module-name = "src"
+module-root = ""
 
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build"]
+build-backend = "uv_build"
 
 [tool.uv.sources]
 mlx-lm = { git = "https://github.com/ml-explore/mlx-lm.git" }
