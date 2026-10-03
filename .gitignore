@@ -13,6 +13,4 @@ dist/
 
 # Downloaded models and generated output
 .hf-cache/
-phrases/generated.txt
-tried.txt
-found.txt
+phrases/*.txt

@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from itertools import chain
 from string import capwords
 
@@ -12,33 +12,22 @@ NUMBERS = tuple(
 # Currency signs go before the number, words after it. Only 1997-era ASCII: no euros (introduced in 1999), no € or £.
 AMOUNT_FORMATS = ("{}", "${}", "{} dollars", "{} bucks")
 # "of" / "worth" only make sense after one of these nouns, e.g. "a raise of 5", but not "Pay Bob and Jerry of 5"
-CONNECTOR_NOUNS = ("raise", "raises", "bonus", "promotion", "increase", "money")
+CONNECTOR_NOUNS = ("raise", "raises", "bonus", "promotion", "increase", "money", "payout", "payday")
 CONNECTORS = ("", "of ", "worth ")  # "" means the amount directly follows the phrase
 PUNCTUATION = (".", "!", "?", "...")
-CASE_VARIANTS = 5  # keep in sync with get_case_variants
 
 
 class Fuzzer:
     def __init__(self):
         pass
 
-    # Deterministic, so it can be called (and printed) up front without generating anything
-    # Keep in sync with fuzz(): ((1 + P) + connectors * N * amount formats * (1 + P)) * case variants
-    def count_variants(self, input: str) -> int:
-        connectors = len(CONNECTORS) if input.lower().endswith(CONNECTOR_NOUNS) else 1
-        with_punct = 1 + len(PUNCTUATION)
-        amounts = connectors * len(NUMBERS) * len(AMOUNT_FORMATS)
-        return (with_punct + amounts * with_punct) * CASE_VARIANTS
-
-    # Lazily yield the case variants (may contain duplicates, e.g. when the input is already lowercase)
-    def get_case_variants(self, input: str) -> Generator[str]:
-        yield input
-        yield input.upper()
-        yield input.lower()
-        yield capwords(
-            input
-        )  # str.title() breaks apostrophes ("Don'T") and digits ("5Dollars")
-        yield input.capitalize()
+    # Unique case variants, so e.g. an already capitalized input is not hashed twice.
+    # count_variants() is therefore an upper bound.
+    # capwords instead of str.title(), which breaks apostrophes ("Don'T") and digits ("5Dollars")
+    def get_case_variants(self, input: str) -> Iterable[str]:
+        return dict.fromkeys(
+            (input, input.upper(), input.lower(), capwords(input), input.capitalize())
+        )
 
     def append_numbers(self, input: str) -> Generator[str]:
         # If the LLM outputs Jerry deserves a raise, we also want to try Jerry deserves a raise of x

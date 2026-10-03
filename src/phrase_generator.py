@@ -6,7 +6,7 @@ import mlx.core as mx
 from dotenv import load_dotenv
 from huggingface_hub import snapshot_download
 from mlx_lm import load, stream_generate
-from mlx_lm.sample_utils import make_sampler
+from mlx_lm.sample_utils import make_logits_processors, make_sampler
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parent
@@ -14,8 +14,15 @@ MODEL = "mlx-community/gemma-4-e4b-it-OptiQ-4bit"
 THINKING = False
 THINKING_LEVEL = "low"
 MAX_TOKENS = 8192
-TEMPERATURE = 0.9
-TOP_P = 0.95
+TEMPERATURE = 0.7
+TOP_P = 0.8
+MIN_P = 0.0
+TOP_K = 20
+PRESENCE_PENALTY = 1.5
+# Lowers the odds of tokens seen in the last REPETITION_CONTEXT_SIZE tokens, so the model repeats fewer phrases.
+# 1.0 turns it off. Too high and it avoids the words every phrase needs (Bob, Jerry, raise).
+REPETITION_PENALTY = 1.05
+REPETITION_CONTEXT_SIZE = 64
 
 SYSTEM_PROMPT = "You job is to help recover a lost passphrase. You do so by writing short English sentences in plain ASCII, one per line, with no numbering, quotes or commentary."
 
@@ -57,6 +64,8 @@ class PhraseGenerator:
             cache_dir=PROJECT_ROOT / ".hf-cache",
         )
         self.model, self.tokenizer = load(model_path)[:2]
+        # "<|channel>thought" is two tokens, the first one marks the start of thinking
+        self.think_start_id = self.tokenizer.encode(self.tokenizer.think_start)[0]
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": USER_PROMPT},
@@ -65,8 +74,7 @@ class PhraseGenerator:
             messages,
             add_generation_prompt=True,
             enable_thinking=THINKING,
-            thinking_level=THINKING_LEVEL,
-            return_dict=False
+            thinking_level=THINKING_LEVEL
         )
 
     def stream_phrases(self) -> Generator[str]:
@@ -76,16 +84,26 @@ class PhraseGenerator:
 
     def _stream_once(self) -> Generator[str]:
         sentence_buffer = ""
-        thinking_phase = THINKING
-        if thinking_phase:
-            print("\033[96m", end="")
+        # The prompt never opens the thinking block: the model writes the opening token itself, or skips
+        # thinking and starts with phrases, even with THINKING = True. So only the stream decides.
+        thinking_phase = False
         for resp in stream_generate(
             self.model,
             self.tokenizer,
             self.prompt,
             MAX_TOKENS,
-            sampler=make_sampler(temp=TEMPERATURE, top_p=TOP_P),
+            sampler=make_sampler(temp=TEMPERATURE, top_p=TOP_P, top_k=TOP_K, min_p=MIN_P),
+            logits_processors=make_logits_processors(
+                repetition_penalty=REPETITION_PENALTY,
+                repetition_context_size=REPETITION_CONTEXT_SIZE,
+                presence_penalty=PRESENCE_PENALTY
+            ),
         ):
+            if resp.token == self.think_start_id and not thinking_phase:
+                thinking_phase = True
+                sentence_buffer = ""
+                print("\033[96m", end="")
+                continue
             if not thinking_phase:
                 # yield sentences to make it easier to process them later on
                 sentence_buffer += resp.text
