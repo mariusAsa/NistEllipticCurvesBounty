@@ -12,7 +12,16 @@ NUMBERS = tuple(
 # Currency signs go before the number, words after it. Only 1997-era ASCII: no euros (introduced in 1999), no € or £.
 AMOUNT_FORMATS = ("{}", "${}", "{} dollars", "{} bucks")
 # "of" / "worth" only make sense after one of these nouns, e.g. "a raise of 5", but not "Pay Bob and Jerry of 5"
-CONNECTOR_NOUNS = ("raise", "raises", "bonus", "promotion", "increase", "money", "payout", "payday")
+CONNECTOR_NOUNS = (
+    "raise",
+    "raises",
+    "bonus",
+    "promotion",
+    "increase",
+    "money",
+    "payout",
+    "payday",
+)
 CONNECTORS = ("", "of ", "worth ")  # "" means the amount directly follows the phrase
 PUNCTUATION = (".", "!", "?", "...")
 

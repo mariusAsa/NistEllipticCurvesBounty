@@ -15,7 +15,9 @@ def main() -> None:
     hasher = Hasher()
     PHRASES_DIR.mkdir(exist_ok=True)
     # Phrases from earlier runs (and repeats within this one) are not hashed again
-    tested = set(TESTED_FILE.read_text().splitlines()) if TESTED_FILE.exists() else set()
+    tested = (
+        set(TESTED_FILE.read_text().splitlines()) if TESTED_FILE.exists() else set()
+    )
     for phrase in llm.stream_phrases():
         if phrase in tested:
             print("SKIP:", phrase)
@@ -29,7 +31,6 @@ def main() -> None:
         # Only recorded once every variant of the phrase has been hashed
         with open(TESTED_FILE, "a") as f:
             f.write(f"{phrase}\n")
-
 
 
 if __name__ == "__main__":

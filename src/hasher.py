@@ -8,12 +8,24 @@ from pathlib import Path
 HASHES_FILE = Path(__file__).resolve().parent / "hashes.txt"
 ALGOS = {"sha1": sha1, "md5": md5}
 # How the first digest is fed into the second hash: raw bytes, or as lower/upper case hex text
-FORMS = {"raw": lambda d: d, "hex": lambda d: d.hex().encode(), "HEX": lambda d: d.hex().upper().encode()}
+FORMS = {
+    "raw": lambda d: d,
+    "hex": lambda d: d.hex().encode(),
+    "HEX": lambda d: d.hex().upper().encode(),
+}
 BATCH = 32_000  # candidates per task sent to a worker
 
 # For each inner hash: its name, and every way to chain an outer hash after it. Names are only built once, here.
 CHAINS = [
-    (inner, inner_hash, [(f"{outer}({inner}, {form})", fn, outer_hash) for form, fn in FORMS.items() for outer, outer_hash in ALGOS.items()])
+    (
+        inner,
+        inner_hash,
+        [
+            (f"{outer}({inner}, {form})", fn, outer_hash)
+            for form, fn in FORMS.items()
+            for outer, outer_hash in ALGOS.items()
+        ],
+    )
     for inner, inner_hash in ALGOS.items()
 ]
 HASHES_PER_CANDIDATE = sum(1 + len(chained) for _, _, chained in CHAINS)
@@ -30,7 +42,9 @@ def _search(batch: tuple[str, ...]) -> tuple[int, list[tuple[str, str, str]]]:
     """Hash a batch of candidates in plain sha1/md5 and chained outer(inner(x)); return the matches."""
     hits = []
     for candidate in batch:
-        data = candidate.encode("ascii")  # strict: fail loudly rather than hash something else
+        data = candidate.encode(
+            "ascii"
+        )  # strict: fail loudly rather than hash something else
         for name, inner, chained in CHAINS:
             first = inner(data).digest()
             if first in _targets:
@@ -48,7 +62,9 @@ class Hasher:
         seeds = {bytes.fromhex(line) for line in hashes_file.read_text().split()}
         # MD5 is 16 bytes, a seed is 20: also match 16-byte digests against the first or last 16 bytes of a seed
         targets = frozenset(seeds | {s[:16] for s in seeds} | {s[-16:] for s in seeds})
-        self.pool = Pool(initializer=_init_worker, initargs=(targets,))  # one worker per core
+        self.pool = Pool(
+            initializer=_init_worker, initargs=(targets,)
+        )  # one worker per core
 
     def hash(self, to_test: Iterable[str]) -> Iterator[tuple[str, str, str]]:
         """Yield (candidate, algorithm, hex digest) for every candidate that matches hashes.txt."""

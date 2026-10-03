@@ -74,7 +74,7 @@ class PhraseGenerator:
             messages,
             add_generation_prompt=True,
             enable_thinking=THINKING,
-            thinking_level=THINKING_LEVEL
+            thinking_level=THINKING_LEVEL,
         )
 
     def stream_phrases(self) -> Generator[str]:
@@ -92,11 +92,13 @@ class PhraseGenerator:
             self.tokenizer,
             self.prompt,
             MAX_TOKENS,
-            sampler=make_sampler(temp=TEMPERATURE, top_p=TOP_P, top_k=TOP_K, min_p=MIN_P),
+            sampler=make_sampler(
+                temp=TEMPERATURE, top_p=TOP_P, top_k=TOP_K, min_p=MIN_P
+            ),
             logits_processors=make_logits_processors(
                 repetition_penalty=REPETITION_PENALTY,
                 repetition_context_size=REPETITION_CONTEXT_SIZE,
-                presence_penalty=PRESENCE_PENALTY
+                presence_penalty=PRESENCE_PENALTY,
             ),
         ):
             if resp.token == self.think_start_id and not thinking_phase:

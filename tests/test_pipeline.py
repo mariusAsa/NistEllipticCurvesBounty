@@ -26,14 +26,18 @@ def b(text: str) -> bytes:
 
 class WithHasher(unittest.TestCase):
     def setUp(self):
-        self.enterContext(contextlib.redirect_stdout(io.StringIO()))  # hide the hashes/s lines
+        self.enterContext(
+            contextlib.redirect_stdout(io.StringIO())
+        )  # hide the hashes/s lines
 
     def hasher(self, *targets: bytes | str) -> Hasher:
         """A Hasher whose targets file holds only the given digests (bytes or hex)."""
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         file = Path(tmp.name) / "hashes.txt"
-        file.write_text("\n".join(t.hex() if isinstance(t, bytes) else t for t in targets))
+        file.write_text(
+            "\n".join(t.hex() if isinstance(t, bytes) else t for t in targets)
+        )
         hasher = Hasher(file)
         self.addCleanup(hasher.pool.terminate)
         return hasher
@@ -57,15 +61,24 @@ class HasherTest(WithHasher):
 
     def test_sha1_of_md5_hex(self):
         target = sha1(md5(b(PHRASE)).hexdigest().encode()).digest()
-        self.assertEqual([m[:2] for m in self.hasher(target).hash([PHRASE])], [(PHRASE, "sha1(md5, hex)")])
+        self.assertEqual(
+            [m[:2] for m in self.hasher(target).hash([PHRASE])],
+            [(PHRASE, "sha1(md5, hex)")],
+        )
 
     def test_sha1_of_sha1_raw(self):
         target = sha1(sha1(b(PHRASE)).digest()).digest()
-        self.assertEqual([m[:2] for m in self.hasher(target).hash([PHRASE])], [(PHRASE, "sha1(sha1, raw)")])
+        self.assertEqual(
+            [m[:2] for m in self.hasher(target).hash([PHRASE])],
+            [(PHRASE, "sha1(sha1, raw)")],
+        )
 
     def test_md5_of_sha1_upper_hex(self):
         target = md5(sha1(b(PHRASE)).hexdigest().upper().encode()).digest() + bytes(4)
-        self.assertEqual([m[:2] for m in self.hasher(target).hash([PHRASE])], [(PHRASE, "md5(sha1, HEX)")])
+        self.assertEqual(
+            [m[:2] for m in self.hasher(target).hash([PHRASE])],
+            [(PHRASE, "md5(sha1, HEX)")],
+        )
 
     def test_no_false_positives(self):
         h = self.hasher(sha1(b"something else").hexdigest())
@@ -77,13 +90,17 @@ class HasherTest(WithHasher):
 
     def test_matches_across_many_batches(self):
         h = self.hasher(sha1(b"phrase 123456").hexdigest())
-        candidates = (f"phrase {i}" for i in range(200_000))  # several batches, several workers
+        candidates = (
+            f"phrase {i}" for i in range(200_000)
+        )  # several batches, several workers
         self.assertEqual([m[0] for m in h.hash(candidates)], ["phrase 123456"])
 
 
 class FuzzerTest(unittest.TestCase):
     def test_case_variants_are_unique(self):
-        variants = list(Fuzzer().get_case_variants(PHRASE))  # capitalize() == the input here
+        variants = list(
+            Fuzzer().get_case_variants(PHRASE)
+        )  # capitalize() == the input here
         self.assertEqual(len(variants), len(set(variants)))
         self.assertEqual(variants.count(PHRASE), 1)
 
@@ -107,7 +124,10 @@ class EndToEndTest(WithHasher):
     def test_fuzzed_variant_is_found(self):
         wanted = "Give Bob And Jerry A Raise Of 7 Bucks."  # case variant of a number + punctuation variant
         h = self.hasher(sha1(b(wanted)).hexdigest())
-        self.assertEqual([m[0] for m in h.hash(Fuzzer().fuzz("Give Bob and Jerry a raise"))], [wanted])
+        self.assertEqual(
+            [m[0] for m in h.hash(Fuzzer().fuzz("Give Bob and Jerry a raise"))],
+            [wanted],
+        )
 
 
 class HashesFileTest(unittest.TestCase):
